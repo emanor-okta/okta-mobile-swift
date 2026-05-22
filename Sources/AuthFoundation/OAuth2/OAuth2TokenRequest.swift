@@ -20,7 +20,7 @@ public protocol OAuth2TokenRequest: APIParsingContext, OAuth2APIRequest, APIRequ
     var clientConfiguration: OAuth2Client.Configuration { get }
     
     /// The originating request context to use when validating the ID token.
-    var tokenValidatorContext: any IDTokenValidatorContext { get }
+    var tokenValidatorContext: any AuthenticationContext { get }
 }
 
 extension OAuth2TokenRequest {

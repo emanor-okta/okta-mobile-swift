@@ -21,7 +21,7 @@ import FoundationNetworking
 actor TestFlow: AuthenticationFlow {
     typealias Delegate = AuthenticationDelegate
     
-    struct Context: AuthenticationContext, IDTokenValidatorContext {
+    struct Context: AuthenticationContext {
         var acrValues: [String]?
         
         var nonce: String?

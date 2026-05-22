@@ -29,6 +29,11 @@ public protocol IDTokenValidator {
 
 /// Protocol used to supply contextual information to a validator.
 ///
+/// > Note: ``AuthenticationContext`` now subsumes this protocol.
+/// > All ``AuthenticationContext`` conformers automatically satisfy
+/// > ``IDTokenValidatorContext`` requirements. New code should use
+/// > ``AuthenticationContext`` directly.
+///
 /// The ``IDTokenValidator`` can use this information to enable or disable certain verification checks.
 public protocol IDTokenValidatorContext: Sendable {
     /// The `nonce` value used when beginning the authentication process.

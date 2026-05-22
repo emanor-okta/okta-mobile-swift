@@ -44,7 +44,7 @@ struct TokenRequest: AuthenticationFlowRequest {
 
 extension TokenRequest: OAuth2TokenRequest, OAuth2APIRequest, APIRequestBody {
     var category: OAuth2APIRequestCategory { .token }
-    var tokenValidatorContext: any IDTokenValidatorContext { NullIDTokenValidatorContext }
+    var tokenValidatorContext: any AuthenticationContext { StandardAuthenticationContext() }
     var bodyParameters: [String: any APIRequestArgument]? {
         var result = clientConfiguration.parameters(for: category) ?? [:]
         result.merge(context.parameters(for: category))

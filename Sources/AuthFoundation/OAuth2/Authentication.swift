@@ -60,22 +60,12 @@ public protocol AuthenticationFlow: Actor, UsesDelegateCollection, IDTokenValida
 extension AuthenticationFlow {
     @_documentation(visibility: private)
     nonisolated public var nonce: String? {
-        guard let validatorContext = withIsolationSync({ await self.context }) as? any IDTokenValidatorContext
-        else {
-            return nil
-        }
-
-        return validatorContext.nonce
+        withIsolationSync { await self.context }?.nonce
     }
 
     @_documentation(visibility: private)
     nonisolated public var maxAge: TimeInterval? {
-        guard let validatorContext = withIsolationSync({ await self.context }) as? any IDTokenValidatorContext
-        else {
-            return nil
-        }
-
-        return validatorContext.maxAge
+        withIsolationSync { await self.context }?.maxAge
     }
 
     /// Resets the authentication flow to its original state, invoking the the completion block once it has reset.
@@ -106,10 +96,22 @@ extension AuthenticationFlow {
 /// Common protocol that all ``AuthenticationFlow`` ``AuthenticationFlow/Context`` type aliases must conform to.
 ///
 /// While instances of a particular ``AuthenticationFlow`` is configured for a particular OAuth2 client, the context supplied to the flow's `start` function represents the specific settings to customize an individual sign-in using that flow.
-public protocol AuthenticationContext: Sendable, ProvidesOAuth2Parameters {
+///
+/// `AuthenticationContext` subsumes ``IDTokenValidatorContext``, providing `nonce` and `maxAge` alongside
+/// additional cross-cutting parameters such as `audience` and `resource`.
+public protocol AuthenticationContext: Sendable, ProvidesOAuth2Parameters, IDTokenValidatorContext {
     /// The ACR values, if any, which should be requested by the client.
     var acrValues: [String]? { get }
-    
+
+    /// The logical name of the target API or resource server
+    /// ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+    /// Sent in the token request.
+    var audience: String? { get }
+
+    /// Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+    /// Sent in the token request.
+    var resource: [String]? { get }
+
     /// The values from this context that should be persisted into the ``Token/Context-swift.struct`` when the resulting token is created.
     ///
     /// This is used to keep some data critical to the future lifecycle of the token associated with the object in storage, which may not be included in the final token response payload.
@@ -117,6 +119,11 @@ public protocol AuthenticationContext: Sendable, ProvidesOAuth2Parameters {
 }
 
 extension AuthenticationContext {
+    public var nonce: String? { nil }
+    public var maxAge: TimeInterval? { nil }
+    public var audience: String? { nil }
+    public var resource: [String]? { nil }
+
     @_documentation(visibility: internal)
     public var persistValues: [String: String]? {
         if let acrValues = acrValues,
@@ -131,6 +138,19 @@ extension AuthenticationContext {
 
 /// Common ``AuthenticationContext`` implementation for common or generic implementations of ``AuthenticationFlow``.
 public struct StandardAuthenticationContext: Sendable, AuthenticationContext {
+    /// The `nonce` value used when beginning the authentication process.
+    public var nonce: String?
+    
+    /// The maximum age the token should support when authenticating.
+    public var maxAge: TimeInterval?
+    
+    /// The logical name of the target API or resource server ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+    public var audience: String?
+    
+    /// Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+    @ClaimCollection
+    public var resource: [String]?
+
     /// The ACR values, if any, which should be requested by the client.
     @ClaimCollection
     public var acrValues: [String]?
@@ -140,11 +160,23 @@ public struct StandardAuthenticationContext: Sendable, AuthenticationContext {
     
     /// Designated initializer.
     /// - Parameters:
+    ///   - nonce: Custom nonce for ID token replay protection.
+    ///   - maxAge: Maximum authentication age (seconds).
+    ///   - audience: Target resource server ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+    ///   - resource: Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
     ///   - acrValues: Authentication Context Reference values to include with this sign-in.
     ///   - additionalParameters: Custom request parameters to be added to requests made for this sign-in.
-    public init(acrValues: ClaimCollection<[String]?> = nil,
+    public init(nonce: String? = nil,
+                maxAge: TimeInterval? = nil,
+                audience: String? = nil,
+                resource: ClaimCollection<[String]?> = nil,
+                acrValues: ClaimCollection<[String]?> = nil,
                 additionalParameters: [String: any APIRequestArgument]? = nil)
     {
+        self.nonce = nonce
+        self.maxAge = maxAge
+        self.audience = audience
+        self._resource = resource
         self._acrValues = acrValues
         self.additionalParameters = additionalParameters?.omitting("acr_values").nilIfEmpty
         
@@ -161,10 +193,22 @@ public struct StandardAuthenticationContext: Sendable, AuthenticationContext {
     public func parameters(for category: OAuth2APIRequestCategory) -> [String: any APIRequestArgument]? {
         var result = additionalParameters ?? [:]
         
-        if category == .authorization,
-           let values = $acrValues.rawValue
-        {
-            result["acr_values"] = values
+        switch category {
+        case .authorization:
+            if let values = $acrValues.rawValue {
+                result["acr_values"] = values
+            }
+            
+        case .token:
+            if let audience = audience {
+                result["audience"] = audience
+            }
+            
+            if let values = $resource.rawValue {
+                result["resource"] = values
+            }
+            
+        case .configuration, .resource, .other: break
         }
 
         return result.nilIfEmpty
