@@ -19,16 +19,17 @@ import JSON
 @testable import AuthFoundation
 @testable import TestCommon
 
-fileprivate struct MockTokenRequest: OAuth2TokenRequest, IDTokenValidatorContext {
+fileprivate struct MockTokenRequest: OAuth2TokenRequest, AuthenticationContext {
     var nonce: String?
     var maxAge: TimeInterval?
-    let context: (any AuthenticationContext)? = nil
+    var acrValues: [String]?
     let openIdConfiguration: OpenIdConfiguration
     let clientConfiguration: OAuth2Client.Configuration
     let url: URL
     let category = OAuth2APIRequestCategory.token
-    var tokenValidatorContext: any IDTokenValidatorContext { self }
+    var tokenValidatorContext: any AuthenticationContext { self }
     var bodyParameters: [String: any APIRequestArgument]?
+    func parameters(for category: OAuth2APIRequestCategory) -> [String: any APIRequestArgument]? { nil }
 }
 
 final class TokenTests: XCTestCase {

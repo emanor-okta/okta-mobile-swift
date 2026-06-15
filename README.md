@@ -182,6 +182,53 @@ pod 'OktaIdxAuth'
 
 ## Usage Guide
 
+Every authentication flow follows the same two-method pattern defined by the
+`AuthenticationFlow` protocol:
+
+1. **`start()`** — initiates the flow (builds an authorize URL, sends
+   credentials, etc.) and returns either a token or an intermediate value
+   needed by the next step.
+2. **`resume()`** _(optional)_ — completes a multi-step flow by exchanging the
+   intermediate value for tokens (e.g., trading an authorization code for an
+   access token, polling for device authorization, etc.).
+
+Single-step flows such as Resource Owner, JWT Bearer, and Token Exchange
+resolve entirely in `start()`. Multi-step flows like Authorization Code and
+Device Authorization require a subsequent call to `resume()`.
+
+All flows accept an optional **authentication context** that carries
+cross-cutting parameters such as `audience`, `resource`, `nonce`, and
+`maxAge`. See [Authentication Context](#authentication-context) below for
+details.
+
+### Authentication Context
+
+All authentication flows accept an optional `context` parameter that carries cross-cutting authentication properties. Some flows require a specific context type (e.g., `AuthorizationCodeFlow.Context` for the Authorization Code flow), while simpler flows use `StandardAuthenticationContext`:
+
+```swift
+let flow = ResourceOwnerFlow(issuerURL: URL(string: "https://example.okta.com")!,
+                             clientId: "abc123client",
+                             scope: "openid offline_access email profile")
+let token = try await flow.start(
+    username: "jane@example.com",
+    password: "secretPassword",
+    context: .init(
+        audience: "api://my-resource-server",
+        resource: "https://api.example.com/v1",  // or an array of URIs
+        maxAge: 3600,
+        nonce: "custom-nonce"
+    )))
+```
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `nonce` | `String?` | Custom nonce for ID token replay protection. |
+| `maxAge` | `TimeInterval?` | Maximum authentication age (seconds). |
+| `audience` | `String?` | Target resource server ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)). Sent in the token request. |
+| `resource` | `[String]?` | Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)). Sent in the token request. Accepts a string literal or an array of strings. |
+| `acrValues` | `[String]?` | Requested Authentication Context Class Reference values. |
+| `additionalParameters` | `[String: String]?` | Extra parameters forwarded to the token request. |
+
 ### Web Authentication using OIDC
 
 The simplest way to integrate authentication in your app is with OIDC through a web browser, using the Authorization Code Flow grant.
@@ -263,8 +310,7 @@ When using the `device_sso` scope, your application can receive a "device secret
 let flow = TokenExchangeFlow(
     issuerURL: URL(string: "https://example.okta.com")!,
     clientId: "abc123client",
-    scope: "openid offline_access email profile",
-    audience: .default)
+    scope: "openid offline_access email profile")
 
 let token = try await flow.start(with: [
     .actor(type: .deviceSecret, value: "DeviceToken"),
@@ -317,7 +363,7 @@ let flow = try InteractionCodeFlow(issuerURL: URL(string: "https://example.okta.
 ```
 
 For more information, see the [OktaIdxAuth API documentation][oktaidxauth-docs].
- 
+
 ## Storing and using tokens
 
 Once your user has authenticated and you have a `Token` object, your application can store and use those credentials. The most direct approach is to use the `Credential.store(_:tags:security:)` function.

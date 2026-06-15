@@ -166,7 +166,7 @@ extension Token.RefreshRequest: OAuth2APIRequest, APIRequestBody, APIParsingCont
     var contentType: APIContentType? { .formEncoded }
     var acceptsType: APIContentType? { .json }
     var category: OAuth2APIRequestCategory { .token }
-    var tokenValidatorContext: any IDTokenValidatorContext { NullIDTokenValidatorContext }
+    var tokenValidatorContext: any AuthenticationContext { StandardAuthenticationContext() }
     var bodyParameters: [String: any APIRequestArgument]? {
         var result: [String: any APIRequestArgument] = [
             "grant_type": "refresh_token",

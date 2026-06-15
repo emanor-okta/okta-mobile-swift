@@ -15,8 +15,19 @@ import Foundation
 extension TokenExchangeFlow {
     /// A model representing the context and current state for an authorization session.
     public struct Context: Sendable, AuthenticationContext {
-        /// Server audience.
-        public var audience: Audience
+        /// The `nonce` value used when beginning the authentication process.
+        public var nonce: String?
+        
+        /// The maximum age the token should support when authenticating.
+        public var maxAge: TimeInterval?
+
+        /// The logical name of the target API or resource server
+        /// ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+        public var audience: String?
+
+        /// Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+        @ClaimCollection
+        public var resource: [String]?
 
         /// The ACR values, if any, which should be requested by the client.
         @ClaimCollection
@@ -25,16 +36,25 @@ extension TokenExchangeFlow {
         /// Any additional query string parameters you would like to supply to the authorization server.
         public var additionalParameters: [String: any APIRequestArgument]?
         
-        /// Initializer for creating a context with a custom state string.
+        /// Initializer for creating a context.
         /// - Parameters:
-        ///   - audience: The audience of the authorization server.
+        ///   - nonce: Custom nonce for ID token replay protection.
+        ///   - maxAge: Maximum authentication age (seconds).
+        ///   - audience: The audience of the authorization server. Defaults to ``TokenExchangeFlow/defaultAudience``.
+        ///   - resource: Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
         ///   - acrValues: Optional ACR values to use.
         ///   - additionalParameters: Optional parameters to include in all requests to the Authorization Server.
-        public init(audience: Audience = .default,
+        public init(nonce: String? = nil,
+                    maxAge: TimeInterval? = nil,
+                    audience: String? = TokenExchangeFlow.defaultAudience,
+                    resource: ClaimCollection<[String]?> = nil,
                     acrValues: ClaimCollection<[String]?> = nil,
                     additionalParameters: [String: any APIRequestArgument]? = nil)
         {
+            self.nonce = nonce
+            self.maxAge = maxAge
             self.audience = audience
+            self._resource = resource
             self._acrValues = acrValues
             self.additionalParameters = additionalParameters?.omitting("acr_values")
 
@@ -47,6 +67,23 @@ extension TokenExchangeFlow {
             }
         }
 
+        /// Initializer accepting the deprecated ``TokenExchangeFlow/Audience`` enum.
+        @available(*, deprecated, message: "Use the String-based audience initializer instead.")
+        public init(nonce: String? = nil,
+                    maxAge: TimeInterval? = nil,
+                    audience: Audience,
+                    resource: ClaimCollection<[String]?> = nil,
+                    acrValues: ClaimCollection<[String]?> = nil,
+                    additionalParameters: [String: any APIRequestArgument]? = nil)
+        {
+            self.init(nonce: nonce,
+                      maxAge: maxAge,
+                      audience: audience.stringValue,
+                      resource: resource,
+                      acrValues: acrValues,
+                      additionalParameters: additionalParameters)
+        }
+
         @_documentation(visibility: internal)
         public func parameters(for category: OAuth2APIRequestCategory) -> [String: any APIRequestArgument]? {
             var result = additionalParameters ?? [:]
@@ -57,8 +94,14 @@ extension TokenExchangeFlow {
                     result["acr_values"] = values
                 }
 
-                result["audience"] = audience
+                if let audience = audience {
+                    result["audience"] = audience
+                }
                 result["grant_type"] = GrantType.tokenExchange
+                
+                if let values = $resource.rawValue {
+                    result["resource"] = values
+                }
                 
             case .configuration, .resource, .other: break
             }

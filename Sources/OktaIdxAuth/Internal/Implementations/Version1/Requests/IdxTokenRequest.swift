@@ -83,7 +83,7 @@ extension InteractionCodeFlow {
 
 extension InteractionCodeFlow.TokenRequest: OAuth2TokenRequest, APIRequestBody, APIParsingContext {
     var category: AuthFoundation.OAuth2APIRequestCategory { .token }
-    var tokenValidatorContext: any IDTokenValidatorContext { context }
+    var tokenValidatorContext: any AuthenticationContext { context }
 
     var bodyParameters: [String: any APIRequestArgument]? {
         let grantType = GrantType.interactionCode
@@ -102,7 +102,7 @@ extension InteractionCodeFlow.TokenRequest: OAuth2TokenRequest, APIRequestBody, 
 extension InteractionCodeFlow.SuccessResponseTokenRequest: OAuth2TokenRequest, APIRequestBody, APIParsingContext {
     var acceptsType: APIContentType? { .other("application/json") }
     var category: AuthFoundation.OAuth2APIRequestCategory { .token }
-    var tokenValidatorContext: any IDTokenValidatorContext { context }
+    var tokenValidatorContext: any AuthenticationContext { context }
 
     var bodyParameters: [String: any APIRequestArgument]? {
         var result = additionalParameters ?? [:]

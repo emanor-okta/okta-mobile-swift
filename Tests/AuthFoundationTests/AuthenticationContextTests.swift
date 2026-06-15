@@ -16,6 +16,10 @@ import XCTest
 final class AuthenticationContextTests: XCTestCase {
     func testStandardContext() throws {
         var context = StandardAuthenticationContext()
+        XCTAssertNil(context.nonce)
+        XCTAssertNil(context.maxAge)
+        XCTAssertNil(context.audience)
+        XCTAssertNil(context.resource)
         XCTAssertNil(context.acrValues)
         XCTAssertNil(context.additionalParameters)
         XCTAssertNil(context.persistValues)
@@ -66,5 +70,45 @@ final class AuthenticationContextTests: XCTestCase {
         context = .init()
         XCTAssertNil(context.acrValues)
         XCTAssertNil(context.additionalParameters)
+    }
+    
+    func testAudienceAndResource() throws {
+        let context = StandardAuthenticationContext(
+            audience: "api://my-resource-server",
+            resource: ["https://api.example.com/v1"]
+        )
+        XCTAssertEqual(context.audience, "api://my-resource-server")
+        XCTAssertEqual(context.resource, ["https://api.example.com/v1"])
+        
+        let tokenParams = context.parameters(for: .token)?.mapValues(\.stringValue)
+        XCTAssertEqual(tokenParams?["audience"], "api://my-resource-server")
+        XCTAssertEqual(tokenParams?["resource"], "https://api.example.com/v1")
+        
+        // audience and resource should not appear in authorization parameters
+        let authParams = context.parameters(for: .authorization)
+        XCTAssertNil(authParams?["audience"])
+        XCTAssertNil(authParams?["resource"])
+    }
+    
+    func testResourceAsStringLiteral() throws {
+        let context = StandardAuthenticationContext(
+            resource: "https://api.example.com/v1 https://api.example.com/v2"
+        )
+        XCTAssertEqual(context.resource, [
+            "https://api.example.com/v1",
+            "https://api.example.com/v2",
+        ])
+        
+        let tokenParams = context.parameters(for: .token)?.mapValues(\.stringValue)
+        XCTAssertEqual(tokenParams?["resource"], "https://api.example.com/v1 https://api.example.com/v2")
+    }
+    
+    func testNonceAndMaxAge() throws {
+        let context = StandardAuthenticationContext(
+            nonce: "custom-nonce",
+            maxAge: 3600
+        )
+        XCTAssertEqual(context.nonce, "custom-nonce")
+        XCTAssertEqual(context.maxAge, 3600)
     }
 }

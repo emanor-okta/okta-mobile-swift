@@ -15,7 +15,7 @@ import AuthFoundation
 
 extension InteractionCodeFlow {
     /// Object that defines the context for the current authentication session, which is required when a session needs to be resumed.
-    public struct Context: AuthenticationContext, IDTokenValidatorContext, Sendable, Codable, Equatable {
+    public struct Context: AuthenticationContext, Sendable, Codable, Equatable {
         /// The ACR values, if any, which should be requested by the client.
         @ClaimCollection
         public var acrValues: [String]?
