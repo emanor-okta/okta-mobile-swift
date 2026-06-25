@@ -19,7 +19,11 @@ import CommonSupport
 
 /// An authentication flow class that implements the Token Exchange Flow.
 public actor TokenExchangeFlow: AuthenticationFlow {
+    /// The default audience string used when no custom audience is specified.
+    public static let defaultAudience = "api://default"
+
     /// Identifies the audience of the authorization server.
+    @available(*, deprecated, message: "Use a plain String audience instead.")
     public enum Audience: Sendable, APIRequestArgument {
         case `default`
         case custom(String)
@@ -27,7 +31,7 @@ public actor TokenExchangeFlow: AuthenticationFlow {
         public var stringValue: String {
             switch self {
             case .default:
-                return "api://default"
+                return TokenExchangeFlow.defaultAudience
             case .custom(let aud):
                 return aud
             }

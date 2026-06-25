@@ -129,8 +129,8 @@ public struct Token: Sendable, Codable, Equatable, Hashable, HasClaims, Expires 
     /// Validates the claims within this JWT token, to ensure it matches the given ``OAuth2Client``.
     /// - Parameters:
     ///   - client: Client to validate the token's claims against.
-    ///   - context: Optional ``IDTokenValidatorContext`` to use when validating the token.
-    public func validate(using client: OAuth2Client, with context: any IDTokenValidatorContext) async throws {
+    ///   - context: Optional ``AuthenticationContext`` to use when validating the token.
+    public func validate(using client: OAuth2Client, with context: any AuthenticationContext) async throws {
         guard let idToken = idToken else {
             return
         }

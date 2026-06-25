@@ -50,7 +50,7 @@ final class AuthorizationCodeFlowRequestTests: XCTestCase {
             authorizationCode: "abc123")
         
         XCTAssertEqual(request.category, .token)
-        XCTAssertTrue(request.tokenValidatorContext is Context)
+        XCTAssertTrue(request.tokenValidatorContext is AuthorizationCodeFlow.Context)
         
         let bodyParameters: [String: String]? = request.bodyParameters?.mapValues(\.stringValue)
         var expected = [

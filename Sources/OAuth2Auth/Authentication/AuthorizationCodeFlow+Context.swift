@@ -14,7 +14,7 @@ import Foundation
 
 extension AuthorizationCodeFlow {
     /// A model representing the context and current state for an authorization session.
-    public struct Context: Sendable, AuthenticationContext, IDTokenValidatorContext {
+    public struct Context: Sendable, AuthenticationContext {
         /// The `PKCE` credentials to use in the authorization request.
         ///
         /// This value may be `nil` on platforms that do not support PKCE.
@@ -98,6 +98,17 @@ extension AuthorizationCodeFlow {
         /// Utilize Pushed Authorization Requests (PAR) if supported by the Authorization Server.
         public var pushedAuthorizationRequestEnabled: Bool = true
         
+
+        /// The logical name of the target API or resource server
+        /// ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+        /// Sent in the token request.
+        public var audience: String?
+        
+        /// Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+        /// Sent in the token request.
+        @ClaimCollection
+        public var resource: [String]?
+
         /// The current authentication URL, or `nil` if one has not yet been generated.
         public internal(set) var authenticationURL: URL?
         
@@ -105,10 +116,14 @@ extension AuthorizationCodeFlow {
         /// - Parameters:
         ///   - state: State string to use, or `nil` to accept an automatically generated default.
         ///   - maxAge: The maximum age an ID token can be when authenticating.
+        ///   - audience: Target resource server ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
+        ///   - resource: Target resource URI(s) ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
         ///   - acrValues: Optional ACR values to use.
         ///   - additionalParameters: Optional parameters to include in all requests to the Authorization Server.
         public init(state: String? = nil,
                     maxAge: TimeInterval? = nil,
+                    audience: String? = nil,
+                    resource: ClaimCollection<[String]?> = nil,
                     acrValues: ClaimCollection<[String]?> = nil,
                     additionalParameters: [String: any APIRequestArgument]? = nil)
         {
@@ -118,6 +133,8 @@ extension AuthorizationCodeFlow {
             self.init(pkce: PKCE(),
                       nonce: nonce,
                       maxAge: maxAge,
+                      audience: audience,
+                      resource: resource,
                       acrValues: acrValues,
                       state: state,
                       additionalParameters: additionalParameters?.omitting("nonce", "max_age", "state"))
@@ -126,6 +143,8 @@ extension AuthorizationCodeFlow {
         init(pkce: PKCE?,
              nonce: String,
              maxAge: TimeInterval?,
+             audience: String? = nil,
+             resource: ClaimCollection<[String]?> = nil,
              acrValues: ClaimCollection<[String]?> = nil,
              state: String,
              additionalParameters: [String: any APIRequestArgument]?)
@@ -134,6 +153,8 @@ extension AuthorizationCodeFlow {
             self.nonce = nonce
             self.state = state
             self.maxAge = maxAge
+            self.audience = audience
+            self._resource = resource
             self._acrValues = acrValues
             
             var remainingParameters = additionalParameters
@@ -206,6 +227,14 @@ extension AuthorizationCodeFlow {
             case .token:
                 if let pkce = pkce {
                     result["code_verifier"] = pkce.codeVerifier
+                }
+                
+                if let audience = audience {
+                    result["audience"] = audience
+                }
+                
+                if let values = $resource.rawValue {
+                    result["resource"] = values
                 }
                 
             case .configuration, .resource, .other: break

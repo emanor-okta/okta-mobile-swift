@@ -93,8 +93,7 @@ func signInUsingDeviceSSO(deviceToken: String, idToken: String) async throws {
     // Create the flow
     let flow = TokenExchangeFlow(issuerURL: issuerUrl,
                                  clientId: clientId,
-                                 scope: "openid profile offline_access",
-                                 audience: .default)
+                                 scope: "openid profile offline_access")
     
     // Exchange the ID and Device tokens for access tokens.
     let token = try await flow.start(with: [
