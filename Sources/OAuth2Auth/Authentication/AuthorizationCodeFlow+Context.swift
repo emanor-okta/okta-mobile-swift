@@ -94,6 +94,10 @@ extension AuthorizationCodeFlow {
                 authenticationURL = nil
             }
         }
+        
+        /// Utilize Pushed Authorization Requests (PAR) if supported by the Authorization Server.
+        public var pushedAuthorizationRequestEnabled: Bool = true
+        
 
         /// The logical name of the target API or resource server
         /// ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)).
