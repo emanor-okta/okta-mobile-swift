@@ -69,12 +69,14 @@ extension Remediation.Form.Field {
             if let form = self.form,
                !form.allFields.isEmpty
             {
+                var nestedJSON = JSON([:])
                 for field in form.allFields {
                     guard let nestedResult = try field.formValue else {
                         continue
                     }
-                    json[name] = nestedResult
+                    nestedJSON.value += nestedResult
                 }
+                json[name] = nestedJSON.value
             }
             
             // Named form values that consist of multiple child options
