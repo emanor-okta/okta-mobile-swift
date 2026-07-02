@@ -14,12 +14,6 @@ import XCTest
 @testable import AuthFoundation
 
 final class SDKVersionRegistrationTests: XCTestCase {
-    /// Regression test for #254 — User-Agent header missing in Release builds.
-    ///
-    /// `SDKVersion.userAgent` is populated as a side effect of evaluating the
-    /// lazy `static let` registration in each `Version+*.swift`. That evaluation
-    /// must run in every build configuration. This test asserts the contract
-    /// after constructing an `OAuth2Client`.
     func testOAuth2ClientInitPopulatesUserAgent() throws {
         let client = OAuth2Client(
             issuerURL: try XCTUnwrap(URL(string: "https://example.okta.com/oauth2/default")),
