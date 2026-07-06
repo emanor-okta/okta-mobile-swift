@@ -87,6 +87,54 @@ class IDXExtractFormValueTests: XCTestCase {
         XCTAssertEqual(result["credentials"], .object(["passcode": "password"]))
     }
 
+    // OKTA-1209004: A named field with a nested `form` containing multiple
+    // child fields (e.g. WebAuthn's `credentials` object) must merge all of
+    // its children into a single object, not overwrite with only the last one.
+    func testNestedWithMultipleChildValues() throws {
+        let form = try XCTUnwrap(Form(fields: [
+            Form.Field(name: "stateHandle",
+                      value: "abcEasyAs123",
+                      visible: false,
+                      mutable: false,
+                      required: true,
+                      secret: false),
+            Form.Field(name: "credentials",
+                      type: "object",
+                      visible: true,
+                      mutable: true,
+                      required: true,
+                      secret: false,
+                      form: Form(fields: [
+                        Form.Field(name: "authenticatorData",
+                                  visible: true,
+                                  mutable: true,
+                                  required: true,
+                                  secret: false),
+                        Form.Field(name: "clientData",
+                                  visible: true,
+                                  mutable: true,
+                                  required: true,
+                                  secret: false),
+                        Form.Field(name: "signatureData",
+                                  visible: true,
+                                  mutable: true,
+                                  required: true,
+                                  secret: false)
+                      ]))
+        ]))
+        form["credentials.authenticatorData"]?.value = "IMIVPkdt3y..."
+        form["credentials.clientData"]?.value = "eyJ0e..."
+        form["credentials.signatureData"]?.value = "MEUC..."
+
+        let result = try form.formValue
+        XCTAssertEqual(result["stateHandle"], "abcEasyAs123")
+        XCTAssertEqual(result["credentials"], [
+            "authenticatorData": "IMIVPkdt3y...",
+            "clientData": "eyJ0e...",
+            "signatureData": "MEUC..."
+        ])
+    }
+
     func testNestedWithNestedDefaults() throws {
         let nestedForm = Form.Field(label: "Security Question",
                                    visible: true,
