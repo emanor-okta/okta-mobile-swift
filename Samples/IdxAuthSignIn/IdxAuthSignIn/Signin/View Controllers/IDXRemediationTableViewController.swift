@@ -116,6 +116,10 @@ class IDXRemediationTableViewController: UITableViewController, IDXResponseContr
         
         poll?.cancel()
 
+        if remediationOption.type == .challengeWebAuthnAutofillUIAuthenticator {
+            signin.presentPasskeyAuthentication(for: remediationOption)
+            return
+        }
         
         if let socialAuth = remediationOption.socialIdp,
            let scheme = signin.flow.client.configuration.redirectUri?.scheme
