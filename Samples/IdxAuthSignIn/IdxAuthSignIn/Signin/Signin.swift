@@ -18,8 +18,22 @@ enum SigninError: Error {
     case genericError(message: String)
     case noClientConfiguration
     case cannotCompleteAuthorization(message: String)
+    case noPasskeyAvailable(message: String)
     case stepUnsupported
     case invalidUrl
+}
+
+extension SigninError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .genericError(message: let message),
+             .cannotCompleteAuthorization(message: let message),
+             .noPasskeyAvailable(message: let message):
+            return message
+        case .noClientConfiguration, .stepUnsupported, .invalidUrl:
+            return nil
+        }
+    }
 }
 
 /// Signin wrapper that uses the Okta IDX client to step through the series
@@ -146,9 +160,29 @@ public final class Signin: NSObject {
                 return "Continue"
             }
 
+        case .challengeWebAuthnAutofillUIAuthenticator:
+            return "Login With Passkey"
+
         default:
             return "Continue"
         }
+    }
+
+    /// Presents the native passkey (Face ID/Touch ID) picker directly, using the WebAuthn
+    /// autofill UI challenge data from the given remediation, bypassing the passive
+    /// autofill-assisted (QuickType) flow.
+    /// - Parameter remediation: The `challenge-webauthn-autofillui-authenticator` remediation.
+    @MainActor
+    func presentPasskeyAuthentication(for remediation: Remediation) {
+        guard let context = PasskeyAuthorizationContext(self, userInitiatedRemediation: remediation) else {
+            showError(SigninError.cannotCompleteAuthorization(message: "Passkey authentication is unavailable for this step"),
+                     recoverable: true)
+            return
+        }
+
+        authorizationContext?.cancel()
+        authorizationContext = context
+        context.presentIfNeeded(userInitiated: true)
     }
 
     /// Called by each view controller once their remediation step has been completed, allowing it to proceed to the next step of the workflow.
@@ -338,6 +372,10 @@ extension Signin {
         nonisolated let webAuthnAuthenticate: WebAuthnAuthenticationCapability?
         nonisolated let webAuthnRegister: WebAuthnRegistrationCapability?
 
+        /// When `true`, only credentials already available on this device are considered —
+        /// the system won't offer to fall back to a nearby device via QR code.
+        nonisolated let preferImmediatelyAvailableCredentials: Bool
+        
         init?(_ signin: Signin, response: Response) {
             var authorizationRequests = [ASAuthorizationRequest]()
 
@@ -378,7 +416,26 @@ extension Signin {
                 return nil
             }
 
+            self.preferImmediatelyAvailableCredentials = false
             self.controller = ASAuthorizationController(authorizationRequests: authorizationRequests)
+            self.controller.delegate = signin
+            self.controller.presentationContextProvider = signin
+        }
+
+        /// Builds a user-initiated context for a single remediation, bypassing autofill-assist
+        /// so the native passkey picker is shown directly via `performRequests()`. Only
+        /// credentials already on this device are considered, so the system won't offer to
+        /// fall back to scanning a QR code with a nearby device.
+        init?(_ signin: Signin, userInitiatedRemediation remediation: Remediation) {
+            guard let capability = remediation.webAuthnAuthentication else {
+                return nil
+            }
+
+            self.mode = .userInitiated
+            self.webAuthnAuthenticate = capability
+            self.webAuthnRegister = nil
+            self.preferImmediatelyAvailableCredentials = true
+            self.controller = ASAuthorizationController(authorizationRequests: [capability.createPlatformCredentialAssertionRequest()])
             self.controller.delegate = signin
             self.controller.presentationContextProvider = signin
         }
@@ -399,7 +456,11 @@ extension Signin {
             }
 
             else if mode == .userInitiated && userInitiated {
-                controller.performRequests()
+                if preferImmediatelyAvailableCredentials {
+                    controller.performRequests(options: .preferImmediatelyAvailableCredentials)
+                } else {
+                    controller.performRequests()
+                }
             }
 
             else {
@@ -497,6 +558,19 @@ extension Signin: ASAuthorizationControllerDelegate {
         if passkeyContext.controller == controller {
             authorizationContext = nil
         }
+
+        // With `preferImmediatelyAvailableCredentials`, a `.canceled` error means no
+        // credential was immediately available on this device, not that the user
+        // dismissed a presented UI — surface a friendlier, actionable message instead.
+        
+        if passkeyContext.preferImmediatelyAvailableCredentials && error.code == .canceled {
+            Task { @MainActor in
+                showError(SigninError.noPasskeyAvailable(message: "No passkey was found on this device. Enter your username to continue."),
+                         recoverable: true)
+            }
+            return
+        }
+         
 
         if error.code != .canceled {
             Task { @MainActor in
