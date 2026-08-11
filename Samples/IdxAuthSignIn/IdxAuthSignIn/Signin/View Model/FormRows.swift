@@ -275,6 +275,9 @@ extension Remediation {
             
         case .unlockAccount, .selectAuthenticatorUnlockAccount:
             return "Unlock Account"
+
+        case .challengeWebAuthnAutofillUIAuthenticator:
+            return "Login With Passkey"
             
         default:
             return "Next"
@@ -350,14 +353,22 @@ extension Response {
         }
         
         remediations.forEach { option in
-            // Autofill UI remediations are intended to be transparent to the user,
-            // so don't display any UI for them.
+            // Autofill UI remediations drive passkey sign-in transparently in the
+            // background, so their form fields are never shown. An explicit button is
+            // still surfaced below so the user can trigger the native passkey picker directly.
             guard option.type != .challengeWebAuthnAutofillUIAuthenticator else {
                 return
             }
 
             self.buildFormSnapshot(&snapshot, remediationOption: option, in: self, delegate: delegate)
         }
+
+        if let passkeyRemediation = remediations[.challengeWebAuthnAutofillUIAuthenticator] {
+            let section = Section(remediationOption: passkeyRemediation)
+            snapshot.appendSections([section])
+            snapshot.appendItems([Row(kind: .button(remediationOption: passkeyRemediation), parent: nil, delegate: delegate)],
+                                 toSection: section)
+        }  
     }
 
     /// Converts a remediation option into a set of objects representing the form, so it can be rendered in the table view.
